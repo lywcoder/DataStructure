@@ -1,72 +1,94 @@
+#ifndef CHAPTER5_VECTOR_LIST_HPP
+#define CHAPTER5_VECTOR_LIST_HPP
+
 #include "linearList.hpp"
-#include <sstream>
+
+#include <algorithm>
+#include <limits>
+#include <ostream>
+#include <stdexcept>
 #include <vector>
 
-template<class T>
+// 同一线性表接口的标准库实现：由 std::vector 管理连续存储与元素生命期。
+template <class T>
 class vectorList : public linearList<T> {
 public:
-    //构造函数，复制构造函数和析构函数
-    vectorList(int initialCapacity = 10);
-    vectorList(const vectorList<T>&);
-    ~vectorList() { delete element; }
+    explicit vectorList(int initialCapacity = 10) {
+        if (initialCapacity < 1)
+            throw std::invalid_argument("initialCapacity must be positive");
+        element.reserve(static_cast<std::size_t>(initialCapacity));
+    }
 
-    //ADT方法
-    bool empty() const { return element->empty(); }
-    int size() const { return (int) element->size(); }
-    T& get(int theIndex) const;
-    int indexOf(const T& theElement) const;
-    void erase(int theIndex);
-    void insert(int theIndex, const T& theElement);
-    void output(std::ostream& out) const;
+    bool empty() const override { return element.empty(); }
+    int size() const override { return static_cast<int>(element.size()); }
+    int capacity() const { return static_cast<int>(element.capacity()); }
 
-    //增加的方法
-    int capacity() const { return (int) element->capacity(); }
+    // 为兼容教材接口保留 T& get(...) const；优先使用 const 正确的 at。
+    T& get(int theIndex) const override {
+        checkIndex(theIndex);
+        return const_cast<T&>(element[static_cast<std::size_t>(theIndex)]);
+    }
 
-    //线性表的其实和结束位置的迭代器
+    T& at(int theIndex) {
+        checkIndex(theIndex);
+        return element[static_cast<std::size_t>(theIndex)];
+    }
+
+    const T& at(int theIndex) const {
+        checkIndex(theIndex);
+        return element[static_cast<std::size_t>(theIndex)];
+    }
+
+    int indexOf(const T& theElement) const override {
+        typename std::vector<T>::const_iterator found =
+            std::find(element.begin(), element.end(), theElement);
+        if (found == element.end()) return -1;
+        return static_cast<int>(found - element.begin());
+    }
+
+    void erase(int theIndex) override {
+        checkIndex(theIndex);
+        element.erase(element.begin() + theIndex);
+    }
+
+    void insert(int theIndex, const T& theElement) override {
+        if (theIndex < 0 || theIndex > size())
+            throw std::out_of_range("vectorList insert index out of range");
+        if (element.size() >= static_cast<std::size_t>(std::numeric_limits<int>::max()))
+            throw std::length_error("vectorList size overflow");
+        const T value(theElement); // 即使实参来自本表，扩容也不会使它悬空。
+        element.insert(element.begin() + theIndex, value);
+    }
+
+    void output(std::ostream& out) const override {
+        for (std::size_t i = 0; i < element.size(); ++i) {
+            if (i != 0) out << ' ';
+            out << element[i];
+        }
+    }
+
     typedef typename std::vector<T>::iterator iterator;
-    iterator begin() { return element->begin(); }
-    iterator end() { return element->end(); }
+    typedef typename std::vector<T>::const_iterator const_iterator;
+    iterator begin() { return element.begin(); }
+    iterator end() { return element.end(); }
+    const_iterator begin() const { return element.begin(); }
+    const_iterator end() const { return element.end(); }
+    const_iterator cbegin() const { return element.cbegin(); }
+    const_iterator cend() const { return element.cend(); }
 
-protected: //增加的成员
-    void checkIndex(int theIndex) const;
-    std::vector<T>* element; //存储线性表元素的向量
+private:
+    void checkIndex(int theIndex) const {
+        if (theIndex < 0 || theIndex >= size())
+            throw std::out_of_range("vectorList index out of range");
+    }
+
+    std::vector<T> element;
 };
 
-//vectorList的构造函数
-template<class T>
-vectorList<T>::vectorList(int initialCapacity) {
-    //构建函数
-    if (initialCapacity < 1) {
-        std::ostringstream s;
-        s << "Initial capacity = " << initialCapacity << " Must be > 0";
-        throw illegalParameterValue(s.str());
-    }
-
-    element = new std::vector<T>;
-    //创建容量为0的空向量
-    element->reserve(initialCapacity);
-
+template <class T>
+std::ostream& operator<<(std::ostream& out, const vectorList<T>& list) {
+    list.output(out);
+    return out;
 }
 
-template<class T>
-vectorList<T>::vectorList(const vectorList<T>& theList) {
-    //复制构造函数
-    element = new vectorList<T>(*theList.element);
-}
-
-//vectorList的删除和插入
-template<class T>
-void vectorList<T>::erase(int theIndex) {
-    //删除索引为theIndex的元素
-    checkIndex(theIndex);
-    element->erase(begin() + theIndex);
-}
-
-template<class T>
-void vectorList<T>::insert(int theIndex, const T& theElement) {
-    if (theIndex < 0 || theIndex > size()) {
-        std::ostringstream s;
-        s << "index = " << theIndex << "size = " << size();
-        throw illegalIndex(s.str());
-    }
-}
+#endif
