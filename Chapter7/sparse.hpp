@@ -1,190 +1,140 @@
-#include "../Chapter5/arrayList.hpp"
+#ifndef CHAPTER7_SPARSE_HPP
+#define CHAPTER7_SPARSE_HPP
+
+#include "matrix.hpp"
+#include <algorithm>
 #include <ostream>
-#include <iostream>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 
-// 异常类定义
-class matrixSizeMismatch {
-public:
-    matrixSizeMismatch(std::string theMessage = "Matrix sizes do not match")
-        : message(theMessage) {}
-    void outputMessage() { std::cout << message << std::endl; }
-private:
-    std::string message;
-};
-
-template<class T>
+// 一个非零项的坐标和值。公开坐标仍从 1 开始。
+template <class T>
 struct matrixTerm {
     int row;
-    int col;  // 统一使用 col 而非 cols
+    int col;
     T value;
+    matrixTerm() : row(0), col(0), value() {}
+    matrixTerm(int r, int c, const T& v) : row(r), col(c), value(v) {}
 };
 
-template<class T>
-class sparseMatrix {
-    // 声明友元函数以访问私有成员
-    friend std::ostream& operator<<(std::ostream& out, const sparseMatrix<T>& x);
-    friend std::istream& operator>>(std::istream& in, sparseMatrix<T>& x);
-
+// 单个数组线性表：仅保存非零三元组，严格按 (row,col) 升序排列。
+// 同一坐标最多出现一次；设置为零时删除该项。
+template <class T>
+class sparseMatrix : public matrixADT<T> {
 public:
-    sparseMatrix(int theRows = 0, int theCols = 0) : rows(theRows), cols(theCols) {}
-    void transpose(sparseMatrix<T>& b);
-    void add(sparseMatrix<T>& b, sparseMatrix<T>& c);
-
-private:
-    int rows;
-    int cols;
-    arrayList<matrixTerm<T>> terms;
-};
-
-template<class T>
-std::ostream& operator<<(std::ostream& out, const sparseMatrix<T>& x) {
-    // 输出矩阵的特征
-    out << "rows = " << x.rows << " columns = " << x.cols << std::endl;
-    out << "nonzero terms = " << x.terms.size() << std::endl;
-
-    // 输出矩阵的项，一行一个
-    for (int i = 0; i < x.terms.size(); i++) {
-        matrixTerm<T> term = x.terms.get(i);
-        out << "a(" << term.row << ',' << term.col << ") = " << term.value << std::endl;
+    sparseMatrix(int rows = 0, int columns = 0)
+        : rows_(rows), columns_(columns) {
+        matrix_detail::checkedArea(rows, columns);
     }
-    return out;
-}
+    int rows() const override { return rows_; }
+    int columns() const override { return columns_; }
+    std::size_t nonZeros() const { return terms_.size(); }
+    const std::vector<matrixTerm<T>>& terms() const { return terms_; }
 
-template<class T>
-std::istream& operator>>(std::istream& in, sparseMatrix<T>& x) {
-    // 输入矩阵的特征
-    int numberOfTerms;
-    std::cout << "Enter number of rows, columns, and #terms" << std::endl;
-    in >> x.rows >> x.cols >> numberOfTerms;
-
-    // 清空原有项（通过逐个删除）
-    while (x.terms.size() > 0) {
-        x.terms.erase(0);
+    T get(int i, int j) const override {
+        matrix_detail::checkIndex(i, j, rows_, columns_);
+        typename std::vector<matrixTerm<T>>::const_iterator it = locate(i, j);
+        return it != terms_.end() && it->row == i && it->col == j ? it->value : T{};
     }
-
-    // 输入项
-    matrixTerm<T> mTerm;
-    for (int i = 0; i < numberOfTerms; i++) {
-        std::cout << "Enter row, column, and value of term " << (i + 1) << std::endl;
-        in >> mTerm.row >> mTerm.col >> mTerm.value;
-
-        x.terms.insert(i, mTerm);
-    }
-
-    return in;
-}
-
-template<class T>
-void sparseMatrix<T>::transpose(sparseMatrix<T>& b) {
-    // 设置转置的矩阵特征
-    b.cols = rows;
-    b.rows = cols;
-
-    // 清空 b 的原有项
-    while (b.terms.size() > 0) {
-        b.terms.erase(0);
-    }
-
-    // 初始化来实现转置
-    int* colSize = new int[cols + 1];
-    int* rowNext = new int[cols + 1];
-
-    // 寻找 *this 中每一列的项的数目
-    for (int i = 1; i <= cols; i++) {
-        colSize[i] = 0;
-    }
-    for (int i = 0; i < terms.size(); i++) {
-        matrixTerm<T> term = terms.get(i);
-        colSize[term.col]++;
-    }
-
-    // 寻找 b 中每一行的起始点
-    rowNext[1] = 0;
-    for (int i = 2; i <= cols; i++) {
-        rowNext[i] = rowNext[i - 1] + colSize[i - 1];
-    }
-
-    // 实施从 *this 到 b 的转置赋值
-    matrixTerm<T> mTerm;
-    for (int i = 0; i < terms.size(); i++) {
-        matrixTerm<T> term = terms.get(i);
-        int j = rowNext[term.col]++;
-        mTerm.row = term.col;
-        mTerm.col = term.row;
-        mTerm.value = term.value;
-        b.terms.insert(j, mTerm);
-    }
-
-    // 释放动态分配的内存
-    delete[] colSize;
-    delete[] rowNext;
-}
-
-template<class T>
-void sparseMatrix<T>::add(sparseMatrix<T>& b, sparseMatrix<T>& c) {
-    // 检验相容性
-    if (rows != b.rows || cols != b.cols) {
-        throw matrixSizeMismatch();
-    }
-
-    // 设置结果矩阵的特征
-    c.rows = rows;
-    c.cols = cols;
-
-    // 清空 c 的原有项
-    while (c.terms.size() > 0) {
-        c.terms.erase(0);
-    }
-
-    // 定义 *this 和 b 的索引
-    int it = 0;
-    int ib = 0;
-    int itEnd = terms.size();
-    int ibEnd = b.terms.size();
-
-    // 遍历 *this 和 b，把相关的项相加
-    while (it < itEnd && ib < ibEnd) {
-        matrixTerm<T> termA = terms.get(it);
-        matrixTerm<T> termB = b.terms.get(ib);
-
-        int tIndex = termA.row * cols + termA.col;
-        int bIndex = termB.row * cols + termB.col;
-
-        if (tIndex < bIndex) {
-            // *this 的项在前面，直接加入 c
-            c.terms.insert(c.terms.size(), termA);
-            it++;
-        } else if (tIndex == bIndex) {
-            // 两项同在一个位置
-            T sum = termA.value + termB.value;
-            if (sum != 0) {
-                // 和不为 0 时才加入结果
-                matrixTerm<T> newTerm;
-                newTerm.row = termA.row;
-                newTerm.col = termA.col;
-                newTerm.value = sum;
-                c.terms.insert(c.terms.size(), newTerm);
-            }
-            it++;
-            ib++;
+    void set(int i, int j, const T& value) override {
+        matrix_detail::checkIndex(i, j, rows_, columns_);
+        const T saved(value); // value 可引用 terms_ 内部元素，先复制以防插入失效。
+        typename std::vector<matrixTerm<T>>::iterator it = locate(i, j);
+        const bool present = it != terms_.end() && it->row == i && it->col == j;
+        if (saved == T{}) {
+            if (present) terms_.erase(it);
+        } else if (present) {
+            it->value = saved;
         } else {
-            // b 的项在前面，直接加入 c
-            c.terms.insert(c.terms.size(), termB);
-            ib++;
+            terms_.insert(it, matrixTerm<T>(i, j, saved));
         }
     }
 
-    // 处理 *this 剩余的项
-    while (it < itEnd) {
-        matrixTerm<T> term = terms.get(it);
-        c.terms.insert(c.terms.size(), term);
-        it++;
+    static sparseMatrix fromDense(const matrix<T>& dense) {
+        sparseMatrix result(dense.rows(), dense.columns());
+        for (int i = 1; i <= dense.rows(); ++i)
+            for (int j = 1; j <= dense.columns(); ++j)
+                if (!(dense(i, j) == T{}))
+                    result.terms_.push_back(matrixTerm<T>(i, j, dense(i, j)));
+        return result;
+    }
+    matrix<T> toDense() const {
+        matrix<T> result(rows_, columns_);
+        for (const matrixTerm<T>& term : terms_) result(term.row, term.col) = term.value;
+        return result;
     }
 
-    // 处理 b 剩余的项
-    while (ib < ibEnd) {
-        matrixTerm<T> term = b.terms.get(ib);
-        c.terms.insert(c.terms.size(), term);
-        ib++;
+    // 两个已排序三元组序列像归并排序一样线性合并。
+    sparseMatrix operator+(const sparseMatrix& other) const {
+        if (rows_ != other.rows_ || columns_ != other.columns_)
+            throw std::invalid_argument("sparse matrix shape mismatch");
+        sparseMatrix result(rows_, columns_);
+        result.terms_.reserve(terms_.size() + other.terms_.size());
+        std::size_t a = 0, b = 0;
+        while (a < terms_.size() && b < other.terms_.size()) {
+            if (before(terms_[a], other.terms_[b])) result.terms_.push_back(terms_[a++]);
+            else if (before(other.terms_[b], terms_[a])) result.terms_.push_back(other.terms_[b++]);
+            else {
+                const T sum = terms_[a].value + other.terms_[b].value;
+                if (!(sum == T{}))
+                    result.terms_.push_back(matrixTerm<T>(terms_[a].row, terms_[a].col, sum));
+                ++a;
+                ++b;
+            }
+        }
+        while (a < terms_.size()) result.terms_.push_back(terms_[a++]);
+        while (b < other.terms_.size()) result.terms_.push_back(other.terms_[b++]);
+        return result;
     }
+
+    // 快速转置：先计数每个旧列有多少项，再算新行起点，最后直接定位写入。
+    sparseMatrix transpose() const {
+        sparseMatrix result(columns_, rows_);
+        result.terms_.resize(terms_.size());
+        std::vector<std::size_t> next(static_cast<std::size_t>(columns_), 0);
+        for (const matrixTerm<T>& term : terms_)
+            ++next[static_cast<std::size_t>(term.col - 1)];
+        std::size_t start = 0;
+        for (std::size_t col = 0; col < next.size(); ++col) {
+            const std::size_t count = next[col];
+            next[col] = start;
+            start += count;
+        }
+        for (const matrixTerm<T>& term : terms_) {
+            const std::size_t position = next[static_cast<std::size_t>(term.col - 1)]++;
+            result.terms_[position] = matrixTerm<T>(term.col, term.row, term.value);
+        }
+        return result;
+    }
+
+private:
+    static bool before(const matrixTerm<T>& a, const matrixTerm<T>& b) {
+        return a.row < b.row || (a.row == b.row && a.col < b.col);
+    }
+    typename std::vector<matrixTerm<T>>::iterator locate(int i, int j) {
+        return std::lower_bound(terms_.begin(), terms_.end(), std::make_pair(i, j),
+            [](const matrixTerm<T>& term, const std::pair<int, int>& key) {
+                return term.row < key.first || (term.row == key.first && term.col < key.second);
+            });
+    }
+    typename std::vector<matrixTerm<T>>::const_iterator locate(int i, int j) const {
+        return std::lower_bound(terms_.begin(), terms_.end(), std::make_pair(i, j),
+            [](const matrixTerm<T>& term, const std::pair<int, int>& key) {
+                return term.row < key.first || (term.row == key.first && term.col < key.second);
+            });
+    }
+    int rows_;
+    int columns_;
+    std::vector<matrixTerm<T>> terms_;
+};
+
+template <class T>
+std::ostream& operator<<(std::ostream& out, const sparseMatrix<T>& value) {
+    out << value.rows() << 'x' << value.columns() << " nnz=" << value.nonZeros();
+    for (const matrixTerm<T>& term : value.terms())
+        out << "\n(" << term.row << ',' << term.col << ")=" << term.value;
+    return out;
 }
+
+#endif
