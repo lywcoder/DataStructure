@@ -1,123 +1,106 @@
-#include <ostream>
-template<class T>
-class matrix {
-    friend std::ostream& operator<<(std::ostream&, const matrix<T>&);
-public:
-    matrix(int theRows = 0, int theColumns = 0);
-    matrix(const matrix<T>&);
-    ~matrix() { delete [] element; }
-    int rows() const { return theColumns; }
-    int columns() const { return theColumns; }
-    T& operator() (int i, int j) const;
+#ifndef CHAPTER7_MATRIX_HPP
+#define CHAPTER7_MATRIX_HPP
 
-    matrix<T>& operator=(const matrix<T>&);
-    matrix<T> operator+() const;
-    matrix<T> operator+(const matrix<T>&) const;
-    matrix<T> operator-() const;
-    matrix<T> operator-(const matrix<T>&) const;
-    matrix<T> operator*(const matrix<T>&) const;
-    matrix<T>& operator+=(const T&);
+#include "matrixADT.hpp"
+#include <ostream>
+#include <stdexcept>
+#include <vector>
+
+// 稠密矩阵：将 r×c 个元素按行优先放入一个连续数组。
+// 公开 (i,j) 对应内部下标 (i-1)*columns + (j-1)。
+template <class T>
+class matrix : public matrixADT<T> {
+public:
+    matrix(int rows = 0, int columns = 0)
+        : rows_(rows), columns_(columns), data_(matrix_detail::checkedArea(rows, columns), T{}) {}
+
+    int rows() const override { return rows_; }
+    int columns() const override { return columns_; }
+
+    T get(int i, int j) const override { return (*this)(i, j); }
+    void set(int i, int j, const T& value) override { (*this)(i, j) = value; }
+
+    T& operator()(int i, int j) {
+        matrix_detail::checkIndex(i, j, rows_, columns_);
+        return data_[offset(i, j)];
+    }
+    const T& operator()(int i, int j) const {
+        matrix_detail::checkIndex(i, j, rows_, columns_);
+        return data_[offset(i, j)];
+    }
+
+    matrix transpose() const {
+        matrix result(columns_, rows_);
+        for (int i = 1; i <= rows_; ++i)
+            for (int j = 1; j <= columns_; ++j)
+                result(j, i) = (*this)(i, j);
+        return result;
+    }
+
+    matrix operator+() const { return *this; }
+    matrix operator-() const {
+        matrix result(rows_, columns_);
+        for (std::size_t i = 0; i < data_.size(); ++i) result.data_[i] = -data_[i];
+        return result;
+    }
+    matrix operator+(const matrix& other) const {
+        checkSameShape(other);
+        matrix result(rows_, columns_);
+        for (std::size_t i = 0; i < data_.size(); ++i)
+            result.data_[i] = data_[i] + other.data_[i];
+        return result;
+    }
+    matrix operator-(const matrix& other) const {
+        checkSameShape(other);
+        matrix result(rows_, columns_);
+        for (std::size_t i = 0; i < data_.size(); ++i)
+            result.data_[i] = data_[i] - other.data_[i];
+        return result;
+    }
+    matrix& operator+=(const matrix& other) {
+        *this = *this + other; // 先形成完整结果，支持 self += self。
+        return *this;
+    }
+    matrix& operator+=(const T& scalar) {
+        for (T& value : data_) value = value + scalar;
+        return *this;
+    }
+
+    matrix operator*(const matrix& other) const {
+        if (columns_ != other.rows_)
+            throw std::invalid_argument("matrix multiplication shape mismatch");
+        matrix result(rows_, other.columns_);
+        for (int i = 1; i <= rows_; ++i)
+            for (int k = 1; k <= columns_; ++k)
+                for (int j = 1; j <= other.columns_; ++j)
+                    result(i, j) = result(i, j) + (*this)(i, k) * other(k, j);
+        return result;
+    }
+
 private:
-    int theRows;
-    int theColumns; 
-    T* element; //数组element
+    std::size_t offset(int i, int j) const {
+        return static_cast<std::size_t>(i - 1) * static_cast<std::size_t>(columns_) +
+               static_cast<std::size_t>(j - 1);
+    }
+    void checkSameShape(const matrix& other) const {
+        if (rows_ != other.rows_ || columns_ != other.columns_)
+            throw std::invalid_argument("matrix shape mismatch");
+    }
+    int rows_;
+    int columns_;
+    std::vector<T> data_;
 };
 
-template<class T>
-matrix<T>::matrix(int theRows, int theColumns) {
-    //矩阵构造函数
-    if (theRows < 0 || theColumns < 0) {
-        throw illegalParameterValue("Rows and columns must be >= 0");
-    }
-    if ((theRows == 0 || theColumns == 0)) {
-        throw illegalParameterValue("Either both or neither rows and columns should be zero");
-        //创建矩阵
-        this->theRows = theRows;
-        this->theColumns = theColumns;
-        element = new T[theColumns *theRows];
-    }
-}
-
-//矩阵类的构造函数和复制构造函数
-template<class T>
-matrix<T>::matrix(const matrix<T>& m) {
-    //创建矩阵
-    theRows = m.theRows;
-    theColumns = m.theColumns;
-    element = new T[theColumns * theRows];
-
-    //复制m的每一个元素
-    copy(m.element, m.element + theRows * theColumns, element);
-}
-
-//矩阵类对赋值运算符的重载
-template<class T>
-matrix<T>& matrix<T>::operator=(const matrix<T>& m) {
-    //赋值 
-    if (this != &m) {
-        delete [] element;
-        theRows = m.theRows;
-        theColumns = m.theColumns;
-        element = new T [theRows * theColumns];
-        copy(m.element, m.element + theRows * theColumns);
-    }
-    return *this;
-}
-
-//矩阵类对于()操作符的重载
-template<class T>
-T& matrix<T>::operator()(int i, int j) const {
-    if (i < 1 || i > theRows || j < 1 || j > theColumns) {
-        throw matrixIndexOutOfBounds();
-    }
-    return element[(i - 1) * theColumns + j -1];
-}
-
-template<class T>
-matrix<T> matrix<T>::operator+(const matrix<T>& m) const {
-    if (theRows != m.theRows || theColumns != m.theColumns) {
-        throw matrixSizeMismatch();
-    }
-
-    //生成结果矩阵
-    matrix<T> w(theRows, theColumns);
-    for (int i = 0; i < theRows * theColumns; i++)
-        w.element = element[i] + m.element[i];
-
-    return w;
-}
-
-//矩阵乘法
-template<class T>
-matrix<T> matrix<T>::operator*(const matrix<T>& m) const {
-    //矩阵乘法，返回结果矩阵
-    if (theColumns != m.theRows) {
-        throw matrixSizeMismatch();
-    }
-
-    matrix<T> w(theRows, m.theColumns);
-
-    //定义*this，m和w的游标并且初始化以为(1,1)元素定位
-    int ct = 0, cm = 0, cw = 0;
-
-    //对于所有i,j进行计算
-    for (int i = 1; i <= theRows; i++) {
-        //计算结果矩阵的第i行
-        for (int j = 1; j <= m.theColumns; j++) {
-            T sum = element[ct] * m.element[cm];
-
-            //累加其余的所有项
-            for (int k = 2; k <= theColumns; k++) {
-                ct++;
-                cm += m.theColumns;
-                sum += element[ct] * m.element[cm];
-            }
-            w.element[cw++] = sum; //存储在w(i,j)
-
-            //从行的起点和下一列从新开始
-            ct += theColumns;
-            cm = 0;
+template <class T>
+std::ostream& operator<<(std::ostream& out, const matrix<T>& value) {
+    for (int i = 1; i <= value.rows(); ++i) {
+        for (int j = 1; j <= value.columns(); ++j) {
+            if (j != 1) out << ' ';
+            out << value(i, j);
         }
+        if (i != value.rows()) out << '\n';
     }
-    return w;
+    return out;
 }
+
+#endif
