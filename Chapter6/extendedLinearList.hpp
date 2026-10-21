@@ -1,16 +1,15 @@
-#ifndef linearList_
-#define linearList_
+#ifndef CHAPTER6_EXTENDED_LINEAR_LIST_HPP
+#define CHAPTER6_EXTENDED_LINEAR_LIST_HPP
 
 #include "../Chapter5/linearList.hpp"
 
-// 扩展的线性表抽象基类，在 linearList 基础上增加 clear 和 push_back
+// 在基本线性表操作上增加清空和尾插。
 template <class T>
-class extendedLinearList : linearList<T> {
+class extendedLinearList : public linearList<T> {
 public:
-    virtual ~extendedLinearList() {}
+    ~extendedLinearList() override {}
     virtual void clear() = 0;
-    virtual void push_back(const T& theElement) = 0;
+    virtual void push_back(const T& value) = 0;
 };
 
 #endif
-
