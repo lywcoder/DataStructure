@@ -1,19 +1,15 @@
-#ifndef chainNode_
-#define chainNode_
+#ifndef CHAPTER6_CHAIN_NODE_HPP
+#define CHAPTER6_CHAIN_NODE_HPP
 
-//1. struct chainNode 
+// 单链结点：element 保存值，next 指向后继；nullptr 表示链尾。
 template <class T>
 struct chainNode {
     T element;
-    chainNode<T> *next;
+    chainNode* next;
 
-    // method
-    chainNode() {}
-    chainNode(const T& element) { this->element = element; }
-    chainNode(const T& element, chainNode<T>* next) {
-        this->element = element;
-        this->next = next;
-    }
+    chainNode() : element(), next(nullptr) {}
+    explicit chainNode(const T& value, chainNode* nextNode = nullptr)
+        : element(value), next(nextNode) {}
 };
 
 #endif

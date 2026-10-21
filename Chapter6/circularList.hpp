@@ -1,190 +1,135 @@
-#ifndef circularListWithHeader_
-#define circularListWithHeader_
+#ifndef CHAPTER6_CIRCULAR_LIST_HPP
+#define CHAPTER6_CIRCULAR_LIST_HPP
 
 #include "chainNode.hpp"
 #include "extendedLinearList.hpp"
-#include <iostream>
-#include <sstream>
 
+#include <limits>
+#include <ostream>
+#include <stdexcept>
+#include <utility>
+
+// 带头结点的循环单链表：空表时 headerNode->next == headerNode。
+// tailNode 指向最后一个数据结点；空表时 tailNode == headerNode。
 template <class T>
 class circularListWithHeader : public extendedLinearList<T> {
 public:
-    circularListWithHeader();
-    circularListWithHeader(const circularListWithHeader<T>&);
-    ~circularListWithHeader();
+    circularListWithHeader()
+        : headerNode(new chainNode<T>()), tailNode(headerNode), listSize(0) {
+        headerNode->next = headerNode;
+    }
 
-    bool empty() const { return listSize == 0; }
-    int size() const { return listSize; }
-    T& get(int theIndex) const;
-    int indexOf(const T& theElement) const;
-    void erase(int theIndex);
-    void insert(int theIndex, const T& theElement);
-    void output(std::ostream& out) const;
+    circularListWithHeader(const circularListWithHeader& other)
+        : headerNode(new chainNode<T>()), tailNode(headerNode), listSize(0) {
+        headerNode->next = headerNode;
+        try {
+            for (chainNode<T>* p = other.headerNode->next;
+                 p != other.headerNode; p = p->next)
+                push_back(p->element);
+        } catch (...) {
+            clear();
+            delete headerNode;
+            throw;
+        }
+    }
 
-    // extendedLinearList 的方法
-    void clear();
-    void push_back(const T& theElement);
+    ~circularListWithHeader() override { clear(); delete headerNode; }
 
-protected:
-    void checkIndex(int theIndex) const;
-    chainNode<T>* headerNode;  // 头结点指针
-    int listSize;              // 元素个数
+    circularListWithHeader& operator=(const circularListWithHeader& other) {
+        circularListWithHeader copy(other);
+        swap(copy);
+        return *this;
+    }
+
+    void swap(circularListWithHeader& other) noexcept {
+        using std::swap;
+        swap(headerNode, other.headerNode);
+        swap(tailNode, other.tailNode);
+        swap(listSize, other.listSize);
+    }
+
+    bool empty() const override { return listSize == 0; }
+    int size() const override { return listSize; }
+    T& get(int index) const override { checkIndex(index); return nodeAt(index)->element; }
+    T& at(int index) { checkIndex(index); return nodeAt(index)->element; }
+    const T& at(int index) const { checkIndex(index); return nodeAt(index)->element; }
+
+    int indexOf(const T& value) const override {
+        int index = 0;
+        for (chainNode<T>* p = headerNode->next; p != headerNode;
+             p = p->next, ++index)
+            if (p->element == value) return index;
+        return -1;
+    }
+
+    void erase(int index) override {
+        checkIndex(index);
+        chainNode<T>* previous = index == 0 ? headerNode : nodeAt(index - 1);
+        chainNode<T>* victim = previous->next;
+        previous->next = victim->next;
+        if (victim == tailNode) tailNode = previous;
+        delete victim;
+        --listSize;
+    }
+
+    void insert(int index, const T& value) override {
+        if (index < 0 || index > listSize)
+            throw std::out_of_range("circular list insert index out of range");
+        if (index == listSize) { push_back(value); return; }
+        chainNode<T>* previous = index == 0 ? headerNode : nodeAt(index - 1);
+        previous->next = new chainNode<T>(value, previous->next);
+        ++listSize;
+    }
+
+    void push_back(const T& value) override {
+        if (listSize == std::numeric_limits<int>::max())
+            throw std::length_error("circular list size overflow");
+        chainNode<T>* fresh = new chainNode<T>(value, headerNode);
+        tailNode->next = fresh;
+        tailNode = fresh;
+        ++listSize;
+    }
+
+    void clear() override {
+        chainNode<T>* p = headerNode->next;
+        while (p != headerNode) {
+            chainNode<T>* next = p->next;
+            delete p;
+            p = next;
+        }
+        headerNode->next = headerNode;
+        tailNode = headerNode;
+        listSize = 0;
+    }
+
+    void output(std::ostream& out) const override {
+        bool first = true;
+        for (chainNode<T>* p = headerNode->next; p != headerNode; p = p->next) {
+            if (!first) out << ' ';
+            out << p->element;
+            first = false;
+        }
+    }
+
+private:
+    void checkIndex(int index) const {
+        if (index < 0 || index >= listSize)
+            throw std::out_of_range("circular list index out of range");
+    }
+    chainNode<T>* nodeAt(int index) const {
+        chainNode<T>* p = headerNode->next;
+        for (int i = 0; i < index; ++i) p = p->next;
+        return p;
+    }
+
+    chainNode<T>* headerNode;
+    chainNode<T>* tailNode;
+    int listSize;
 };
 
-// 构造函数
 template <class T>
-circularListWithHeader<T>::circularListWithHeader() {
-    headerNode = new chainNode<T>();
-    headerNode->next = headerNode;
-    listSize = 0;
-}
-
-// 拷贝构造函数
-template <class T>
-circularListWithHeader<T>::circularListWithHeader(const circularListWithHeader<T>& theList) {
-    headerNode = new chainNode<T>();
-    headerNode->next = headerNode;
-    listSize = 0;
-
-    if (theList.listSize == 0)
-        return;
-
-    chainNode<T>* sourceNode = theList.headerNode->next;
-    chainNode<T>* targetNode = headerNode;
-    while (sourceNode != theList.headerNode) {
-        targetNode->next = new chainNode<T>(sourceNode->element);
-        targetNode = targetNode->next;
-        sourceNode = sourceNode->next;
-    }
-    targetNode->next = headerNode;
-    listSize = theList.listSize;
-}
-
-// 析构函数
-template <class T>
-circularListWithHeader<T>::~circularListWithHeader() {
-    clear();
-    delete headerNode;
-}
-
-// 检查下标合法性
-template <class T>
-void circularListWithHeader<T>::checkIndex(int theIndex) const {
-    if (theIndex < 0 || theIndex >= listSize) {
-        std::ostringstream s;
-        s << "index = " << theIndex << " size = " << listSize;
-        throw illegalIndex(s.str());
-    }
-}
-
-// 返回下标为 theIndex 的元素
-template <class T>
-T& circularListWithHeader<T>::get(int theIndex) const {
-    checkIndex(theIndex);
-
-    chainNode<T>* currentNode = headerNode->next;
-    for (int i = 0; i < theIndex; i++)
-        currentNode = currentNode->next;
-
-    return currentNode->element;
-}
-
-// 返回 theElement 首次出现的下标，不存在返回 -1
-template <class T>
-int circularListWithHeader<T>::indexOf(const T& theElement) const {
-    // 将 theElement 放入头结点作为哨兵
-    headerNode->element = theElement;
-
-    chainNode<T>* currentNode = headerNode->next;
-    int index = 0;
-    while (currentNode->element != theElement) {
-        currentNode = currentNode->next;
-        index++;
-    }
-
-    if (currentNode == headerNode)
-        return -1;
-    else
-        return index;
-}
-
-// 删除下标为 theIndex 的元素
-template <class T>
-void circularListWithHeader<T>::erase(int theIndex) {
-    checkIndex(theIndex);
-
-    chainNode<T>* deleteNode;
-    if (theIndex == 0) {
-        deleteNode = headerNode->next;
-        headerNode->next = deleteNode->next;
-    } else {
-        chainNode<T>* p = headerNode->next;
-        for (int i = 0; i < theIndex - 1; i++)
-            p = p->next;
-
-        deleteNode = p->next;
-        p->next = p->next->next;
-    }
-    listSize--;
-    delete deleteNode;
-}
-
-// 在下标 theIndex 处插入 theElement
-template <class T>
-void circularListWithHeader<T>::insert(int theIndex, const T& theElement) {
-    if (theIndex < 0 || theIndex > listSize) {
-        std::ostringstream s;
-        s << "index = " << theIndex << " size = " << listSize;
-        throw illegalIndex(s.str());
-    }
-
-    if (theIndex == 0)
-        headerNode->next = new chainNode<T>(theElement, headerNode->next);
-    else {
-        chainNode<T>* p = headerNode->next;
-        for (int i = 0; i < theIndex - 1; i++)
-            p = p->next;
-
-        p->next = new chainNode<T>(theElement, p->next);
-    }
-    listSize++;
-}
-
-// 输出链表
-template <class T>
-void circularListWithHeader<T>::output(std::ostream& out) const {
-    for (chainNode<T>* currentNode = headerNode->next;
-         currentNode != headerNode;
-         currentNode = currentNode->next)
-        out << currentNode->element << "  ";
-}
-
-// 删除除头结点外的所有结点
-template <class T>
-void circularListWithHeader<T>::clear() {
-    while (headerNode->next != headerNode) {
-        chainNode<T>* nextNode = headerNode->next->next;
-        delete headerNode->next;
-        headerNode->next = nextNode;
-    }
-    listSize = 0;
-}
-
-// 在链表尾部插入元素
-template <class T>
-void circularListWithHeader<T>::push_back(const T& theElement) {
-    chainNode<T>* lastNode = headerNode;
-    while (lastNode->next != headerNode)
-        lastNode = lastNode->next;
-
-    lastNode->next = new chainNode<T>(theElement, headerNode);
-    listSize++;
-}
-
-// 重载 <<
-template <class T>
-std::ostream& operator<<(std::ostream& out, const circularListWithHeader<T>& x) {
-    x.output(out);
+std::ostream& operator<<(std::ostream& out, const circularListWithHeader<T>& list) {
+    list.output(out);
     return out;
 }
 
