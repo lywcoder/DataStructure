@@ -1,28 +1,14 @@
 #include <iostream>
+#include <vector>
 
-int main(void) {
-    int numberOfRows = 5;
+// 不规则二维数组：每行可以有不同的长度，并非一个矩形矩阵。
+int main() {
+    const std::vector<std::size_t> lengths = {6, 3, 4, 2, 7};
+    std::vector<std::vector<int>> rows;
+    for (std::size_t length : lengths) rows.push_back(std::vector<int>(length, 0));
 
-    //定义每一行的长度
-    int length[5] = {6, 3, 4, 2, 7};
-
-    //声明一个二维数组的变量
-    int** irregularArray = new int* [numberOfRows];
-    
-    //分配每一行的空间
-    for (int i = 0; i < numberOfRows; i++) {
-        irregularArray[i] = new int [length[i]];
-    }
-
-    //像使用规则数组一样使用不规则数组
-    irregularArray[2][3] = 5;
-    irregularArray[4][6] = irregularArray[2][3] + 2;
-    irregularArray[1][1] = 3;
-
-    //输出选择的数组元素
-    std::cout << irregularArray[2][3] << std::endl;
-    std::cout << irregularArray[4][6] << std::endl;
-    std::cout << irregularArray[1][1] << std::endl;
-
-    return 0;
+    rows[2][3] = 5;
+    rows[4][6] = rows[2][3] + 2;
+    rows[1][1] = 3;
+    std::cout << rows[2][3] << '\n' << rows[4][6] << '\n' << rows[1][1] << '\n';
 }
