@@ -1,15 +1,11 @@
-#ifndef queueEmpty_
-#define queueEmpty_
+#ifndef CHAPTER9_QUEUE_EMPTY_HPP
+#define CHAPTER9_QUEUE_EMPTY_HPP
 
-#include <iostream>
-#include <string>
+#include <stdexcept>
 
-class queueEmpty {
+class queueEmpty : public std::out_of_range {
 public:
-    queueEmpty(std::string theMessage = "Queue is empty") : message(theMessage) {}
-    void outputMessage() { std::cout << message << std::endl; }
-private:
-    std::string message;
+    queueEmpty() : std::out_of_range("queue is empty") {}
 };
 
 #endif
