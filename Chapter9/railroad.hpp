@@ -1,64 +1,97 @@
-#include "iostream"
+#ifndef CHAPTER9_RAILROAD_HPP
+#define CHAPTER9_RAILROAD_HPP
+
 #include "arrayQueue.hpp"
+#include <limits>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-arrayQueue<int>* track;//缓冲轨道数组
-int numberOfTracks;
-int numberOfCars;
-int itsTrack; //
-int smallestCar; // 缓冲轨道中编号最小的车厢
+struct QueueRailMove {
+    int car;
+    std::string from;
+    std::string to;
+};
+struct QueueRailroadResult {
+    bool success;
+    int nextNeeded;
+    std::vector<QueueRailMove> moves; // 失败时也保留已完成的搬移。
+};
 
-void outputFromHoldingTrack() {
-    //将编号最小的车厢从缓冲轨道移到出轨道
-    //从栈中删除编号最小的车厢
-    track[itsTrack].pop();
-    std::cout << "Move car " << smallestCar << " from holding track " << itsTrack << " to output track" << std::endl;
-
-    //检查所有栈的栈顶，寻找编号最小的车厢和所属的栈
-    smallestCar = numberOfCars + 2;
-    for (int i = 1; i <= numberOfCars; i++) {
-        if (!track[i].empty() && track[i].front() < smallestCar) {
-            smallestCar = track[i].front();
-            itsTrack = i;
-        }
+// 每条缓冲轨道是 FIFO 队列：从队首到队尾保持严格递增。
+// 放入 c 时选 back<c 且 back 最大的非空轨道；否则选第一条空轨道。
+inline QueueRailroadResult rearrangeRailroadWithQueues(
+    const std::vector<int>& input, int holdingTrackCount) {
+    if (holdingTrackCount < 0)
+        throw std::invalid_argument("negative holding track count");
+    if (holdingTrackCount == std::numeric_limits<int>::max() ||
+        input.size() >= static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        throw std::length_error("too many cars or tracks");
+    const int n = static_cast<int>(input.size());
+    std::vector<char> seen(input.size() + 1, 0);
+    for (int car : input) {
+        if (car < 1 || car > n || seen[static_cast<std::size_t>(car)])
+            throw std::invalid_argument("input must be a permutation of 1..n");
+        seen[static_cast<std::size_t>(car)] = 1;
     }
-}
 
-//把车厢调入一个缓冲轨道
-bool putInHoldingTrack(int c) {
-    //将车厢c移到一个缓冲轨道，返回false，当且仅当没有可用的缓冲轨道
-    //为车厢c寻找最合适的缓冲轨道
-    int bestTrack = 0, //目前最合适的缓冲轨道
-        bestLast = 0; //besttrack中最后的车厢
+    std::vector<arrayQueue<int>> tracks(static_cast<std::size_t>(holdingTrackCount + 1));
+    QueueRailroadResult result = {false, 1, {}};
+    int next = 1;
+    const auto drain = [&]() {
+        while (true) {
+            int ready = 0;
+            for (int t = 1; t <= holdingTrackCount; ++t)
+                if (!tracks[static_cast<std::size_t>(t)].empty() &&
+                    tracks[static_cast<std::size_t>(t)].front() == next) {
+                    ready = t;
+                    break;
+                }
+            if (ready == 0) break;
+            tracks[static_cast<std::size_t>(ready)].pop();
+            result.moves.push_back(QueueRailMove{
+                next, "holding " + std::to_string(ready), "output"});
+            ++next;
+        }
+    };
 
-    //扫描缓冲轨道
-    for (int i = 1; i <= numberOfTracks; i++) {
-        if (!track[i].empty()) {
-            //缓冲轨道i不空
-            int lastCar = track[i].back();
-            if (c > lastCar && lastCar > bestLast) {
-                //缓冲轨道i的尾部具有编号更大的车厢
-                bestLast = lastCar;
-                bestTrack = i;
+    for (int car : input) {
+        if (car == next) {
+            result.moves.push_back(QueueRailMove{car, "input", "output"});
+            ++next;
+            drain();
+            continue;
+        }
+        int best = 0, firstEmpty = 0, bestBack = 0;
+        for (int t = 1; t <= holdingTrackCount; ++t) {
+            const arrayQueue<int>& track = tracks[static_cast<std::size_t>(t)];
+            if (track.empty()) {
+                if (firstEmpty == 0) firstEmpty = t;
+            } else if (track.back() < car && track.back() > bestBack) {
+                best = t;
+                bestBack = track.back();
             }
         }
-        else {
-            //缓冲轨道i为空
-            if (bestTrack == 0)  {
-                bestTrack = i;
-            }
+        if (best == 0) best = firstEmpty;
+        if (best == 0) {
+            result.nextNeeded = next;
+            return result;
         }
+        tracks[static_cast<std::size_t>(best)].push(car);
+        result.moves.push_back(QueueRailMove{
+            car, "input", "holding " + std::to_string(best)});
     }
-
-    if (bestTrack == 0) return false; //没有可以使用的缓冲轨道
-
-    //把轨道c移到besttrack
-    track[bestTrack].push(c);
-    std::cout << "Move Car " << c << " from input track " << "to holding track" << bestTrack << std::endl;
-
-    //如果需要，更新smallestcar和itstrack
-    if (c < smallestCar) {
-        smallestCar = c;
-        itsTrack = bestTrack;
-    }
-    return true;
+    drain();
+    result.nextNeeded = next;
+    result.success = next == n + 1;
+    return result;
 }
+
+inline void printQueueRailroadMoves(const QueueRailroadResult& result, std::ostream& out) {
+    for (const QueueRailMove& move : result.moves)
+        out << "car " << move.car << ": " << move.from << " -> " << move.to << '\n';
+    out << (result.success ? "rearrangement succeeded" : "rearrangement failed") << '\n';
+}
+
+#endif
