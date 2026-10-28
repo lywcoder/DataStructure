@@ -3,9 +3,12 @@
 #include "sortedChain.hpp"
 #include "skipList.hpp"
 #include "hashTable.hpp"
+#include "linearProbingHashTable.hpp"
+#include "lzw.hpp"
 #include <cstddef>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -35,6 +38,7 @@ int main() {
     sortedChain<int, std::string> chain;
     skipList<int, std::string> skip(8, 0.5, 42);
     hashTable<int, std::string, ConstantHash> hash(3, 0.75);
+    linearProbingHashTable<int, std::string, ConstantHash> probing(3, 0.7);
 
     std::cout << "=== Sorted array ===\n";
     exerciseDictionary(array);
@@ -65,4 +69,20 @@ int main() {
               << ", load=" << hash.loadFactor() << '\n';
     std::cout << "Pointer to key 20 is stable: " << std::boolalpha
               << (saved == hash.find(20)) << '\n';
+
+    std::cout << "\n=== Linear probing (all keys collide) ===\n";
+    exerciseDictionary(probing);
+    std::cout << "slots=" << probing.bucketCount()
+              << ", tombstones=" << probing.tombstones()
+              << ", load=" << probing.loadFactor() << '\n';
+    std::cout << "Slot traversal (not sorted):\n" << probing;
+    probing.rehash(probing.bucketCount());
+    std::cout << "After tombstone cleanup: tombstones="
+              << probing.tombstones() << '\n';
+
+    const std::string sample = "ABABABA";
+    const std::vector<int> codes = lzwCompress(sample);
+    std::cout << "\nLZW " << sample << " ->";
+    for (int code : codes) std::cout << ' ' << code;
+    std::cout << " -> " << lzwDecompress(codes) << '\n';
 }
