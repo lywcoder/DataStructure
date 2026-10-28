@@ -3,7 +3,6 @@
 #include "histogram.hpp"
 #include "bestFitBinPacking.hpp"
 #include "crossingDistribution.hpp"
-#include "avlTree.hpp"
 #include <iostream>
 #include <string>
 #include <utility>
@@ -49,12 +48,4 @@ int main() {
     for (int count : crossings.perWire) std::cout << count << ' ';
     std::cout << "(total " << crossings.total << ")\n";
 
-    avlTree<int, std::string> balanced;
-    for (int key = 1; key <= 15; ++key)
-        balanced.insert({key, "value-" + std::to_string(key)});
-    std::cout << "AVL sorted insertion: size=" << balanced.size()
-              << " height=" << balanced.height() << '\n';
-    balanced.erase(8);
-    std::cout << "AVL after erase(8): height=" << balanced.height()
-              << " valid=" << balanced.valid() << '\n';
 }
