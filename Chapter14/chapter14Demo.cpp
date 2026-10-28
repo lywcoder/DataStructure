@@ -1,4 +1,8 @@
 #include "binarySearchTree.hpp"
+#include "indexedBinarySearchTree.hpp"
+#include "histogram.hpp"
+#include "bestFitBinPacking.hpp"
+#include "crossingDistribution.hpp"
 #include <iostream>
 #include <string>
 #include <utility>
@@ -20,4 +24,27 @@ int main() {
         std::cout << item.first << ' ';
     });
     std::cout << "\nsize=" << students.size() << " height=" << students.height() << '\n';
+
+    indexedBinarySearchTree<int, std::string> indexed;
+    for (int key : keys) indexed.insert({key, "student-" + std::to_string(key)});
+    std::cout << "index 3 key=" << indexed.get(3)->first
+              << ", rank(7)=" << indexed.rank(7) << '\n';
+    indexed.eraseAt(3);
+    std::cout << "after eraseAt(3), index 3 key=" << indexed.get(3)->first << '\n';
+
+    std::cout << "histogram: ";
+    for (const auto& item : histogram(std::vector<int>{2, 4, 2, 2, 3, 4, 2, 6, 4, 2}))
+        std::cout << item.first << ':' << item.second << ' ';
+    std::cout << '\n';
+
+    const BinPackingResult packing = bestFitBinPacking({4, 8, 1, 4, 2, 1}, 10);
+    std::cout << "best-fit bin of each item: ";
+    for (int bin : packing.binOfItem) std::cout << bin << ' ';
+    std::cout << '\n';
+
+    const CrossingDistribution crossings =
+        crossingDistribution({8, 7, 4, 2, 5, 1, 9, 3, 10, 6});
+    std::cout << "crossings per wire: ";
+    for (int count : crossings.perWire) std::cout << count << ' ';
+    std::cout << "(total " << crossings.total << ")\n";
 }

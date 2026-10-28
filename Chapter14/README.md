@@ -1,6 +1,6 @@
 # 第 14 章：二叉搜索树（Binary Search Tree）
 
-本章从“怎样同时方便地**按键查找**和**插入**”出发，推导二叉搜索树（BST）的结构，再逐步讲解搜索、插入、删除和高度。建议先读第 1～4 节并运行 `chapter14Demo.cpp`，再对照 `binarySearchTree.hpp` 看第 5～8 节。
+本章从“怎样同时方便地**按键查找**和**插入**”出发，推导二叉搜索树（BST）的结构，再讲解索引 BST 和三个应用。建议先读第 1～4 节并运行 `chapter14Demo.cpp`，再对照源码阅读后面的算法。
 
 ## 1. 为什么会想到二叉搜索树？
 
@@ -35,6 +35,7 @@
 | --- | --- |
 | `empty()`、`size()` | 判断空树、读取数对个数 |
 | `find(key)` | 找到时返回数对指针，找不到返回 `nullptr` |
+| `lowerBound(key)` | 返回键不小于 `key` 的最小数对，找不到返回 `nullptr` |
 | `insert({key,value})` | 新键接入叶位置；已有键更新值，不增加结点数 |
 | `erase(key)` | 删除该键；键不存在时不改变树 |
 | `height()` | 空树为 0，单结点树为 1，按结点层数计高度 |
@@ -111,15 +112,105 @@ students.erase(8);
 int h = students.height();
 ```
 
-若按 `dictionary<K,E>&` 使用该对象，可调用 ADT 的 `find/insert/erase/size/empty`；`height`、`inOrder`、`clear` 是具体 BST 提供的扩展操作。`testChapter14.cpp` 还演示了只有自定义比较器、没有 `operator==` 或默认构造函数的键和值。
+若按 `dictionary<K,E>&` 使用该对象，可调用 ADT 的 `find/insert/erase/size/empty`；`lowerBound`、`height`、`inOrder`、`clear` 是具体 BST 提供的扩展操作。`testChapter14.cpp` 还演示了只有自定义比较器、没有 `operator==` 或默认构造函数的键和值。
 
-## 8. 文件与运行
+## 8. 索引二叉搜索树：把“第几个”也存进树里
+
+普通 BST 根据**键的大小**选择左右子树，但如果问“排序后的第 5 个元素是什么”，不保存额外信息就要中序走过前面的元素。`indexedBinarySearchTree.hpp` 给每个结点增加 `subtreeSize`，表示以该结点为根的子树共有多少结点；教材常用 `leftSize` 表示左子树结点数，本实现随时用 `size(left)` 算出同一个数。
+
+```text
+          8  (整个子树有 9 个，左边有 5 个)
+        /   \
+       3     10
+      / \      \
+     1   6      14
+        / \     /
+       4   7   13
+
+中序下标（从 0 开始）：0 1 2 3 4 5 6 7 8
+对应键：              1 3 4 6 7 8 10 13 14
+```
+
+### 按序号 `get(i)`
+
+来到结点 `x`，令 `L = size(x.left)`：
+
+- `i < L`：答案在左子树，序号不变。
+- `i == L`：当前结点就是答案。
+- `i > L`：答案在右子树，改用右子树内的序号 `i-L-1`。
+
+例如 `get(3)`：在根 `8` 看见左边有 5 个，进入左子树；在 `3` 看见左边有 1 个，进入右子树并把序号变成 `3-1-1=1`；在 `6` 看见左边有 1 个，命中键 `6`。越界返回 `nullptr`。
+
+### 求排名 `rank(key)`
+
+`rank(key)` 返回**严格小于**该键的结点数；键不存在也有确定答案，即它若插入时的有序位置。向右走时，当前结点及其整个左子树都小于目标，于是累加 `L+1`；向左走不累加。例如 `rank(7)=4`，`rank(5)=3`。它也可看作 `lowerBound(key)` 的序号。
+
+### 插入、按键删除、按序号删除
+
+插入与普通 BST 一样沿键比较找空位；每个经过的祖先在新结点接入后都要重新计算 `subtreeSize = 1 + size(left) + size(right)`。重复键只更新值，结点数不变。按键删除与按序号删除都要在返回路径上更新规模；删除双孩子结点时，先摘下右子树最小的后继，再让它接替目标位置，更新受影响的子树规模。`eraseAt(i)` 成功返回 `true`，越界返回 `false`。
+
+```cpp
+indexedBinarySearchTree<int, std::string> tree;
+tree.insert({8, "A"});
+tree.insert({3, "B"});
+tree.insert({10, "C"});
+tree.get(1)->first;  // 8：排序后下标 1 的键
+tree.rank(9);         // 2：比 9 小的键有 3、8
+tree.eraseAt(0);      // 删除最小键 3
+```
+
+这些操作只走一条树路径，时间 `O(h)`；树较均衡时约 `O(log n)`，退化时最坏 `O(n)`。插入和删除用显式路径数组维护子树规模，额外空间 `O(h)`，避免退化树上递归调用栈溢出。**索引只解决“第几个”的定位问题，不会使树自动平衡。**
+
+## 9. 应用一：直方图
+
+直方图统计不同键出现的次数。例如输入 `[2,4,2,2,3,4,2,6,4,2]`，输出按键升序排列的 `(键,次数)`：`(2,5),(3,1),(4,3),(6,1)`。
+
+`histogram.hpp` 以普通 BST 字典存 `键 → 次数`：逐个读入；找到键就将值加一，没找到就插入次数一；最后中序遍历输出。因此不必先给整个输入排序，树只保存 `m` 个不同键。若树高为 `h_m`，处理 `n` 个输入的时间为 `O(n h_m + m)`，额外空间 `O(m)`；形状较均衡时约 `O(n log m + m)`，退化时可达 `O(nm)`。这里的“直方图”是**离散键频数表**，不是把连续实数分桶的统计图。
+
+## 10. 应用二：箱子装载的最优匹配法（Best-Fit）
+
+给定容量相同的箱子，物品按输入顺序到达。对当前大小为 `s` 的物品，查看所有剩余容量至少为 `s` 的箱子，选择**剩余容量最小**的那个；若有多个相同容量，选择编号最小的箱子。若没有箱子放得下，就开新箱子。
+
+`bestFitBinPacking.hpp` 把可用箱子放进 BST，键是 `(剩余容量, 箱号)`。按字典序查找 `lowerBound((s,-1))`，恰好得到放得下物品且最紧的箱子，并自然处理相同剩余容量的平局。放入物品后，剩余容量改变，**必须先删除旧键，再插入新键**；不能原地改键，否则 BST 的顺序会被破坏。已装满的箱子不再进入可用树。
+
+```text
+容量 10，物品 4,8,1,4,2,1
+物品 4 → 新箱 0，余 6
+物品 8 → 新箱 1，余 2
+物品 1 → 箱 1，余 1（比放入箱 0 更紧）
+物品 4 → 箱 0，余 2
+物品 2 → 箱 0，余 0
+物品 1 → 箱 1，余 0
+结果箱号：0,1,1,0,0,1
+```
+
+中文“最优匹配”指**当前这一步**的最紧适配，不保证全局所需箱子数最少。例如容量 10、物品 `6,5,3,2,4` 按此法使用 3 个箱子；若分成 `(6,4)` 和 `(5,3,2)`，只需 2 个。对于 `n` 个物品、BST 高度 `h`，每个物品查找、删除、插入各需 `O(h)`，总计 `O(nh)`，普通 BST 最坏 `O(n²)`。输入大小必须在 `(0, capacity]`；结果 `binOfItem` 与输入顺序对应，箱号从 0 开始。
+
+## 11. 应用三：交叉分布
+
+本节按教材“交叉分布”（Crossing Distribution）的意思理解：两排各有 `n` 个端点，上排从左到右编号 `1..n`；数组 `C[i]` 表示上排第 `i` 条线连接到下排哪个端点，所以 `C` 是 `1..n` 的一个排列。两条线 `i<j` 相交，**当且仅当** `C[i]>C[j]`。这正是排列的一个**逆序对**。
+
+若想知道“每条线与它右侧的线相交多少次”，从右往左扫描。处理 `i` 时，索引 BST 已保存所有 `j>i` 的下排端点；`rank(C[i])` 直接给出其中小于 `C[i]` 的数量，记到 `perWire[i]`，再把 `C[i]` 插入树。将 `perWire` 求和便是总交叉数，每对交叉只计一次。
+
+```text
+C = [8,7,4,2,5,1,9,3,10,6]
+每条线与右侧线的交叉数 = [7,6,3,1,2,0,2,0,1,0]
+总交叉数 = 22
+```
+
+`crossingDistribution.hpp` 对输入先检查是否为排列，返回 `perWire` 和 `total`。若当前树高为 `h`，总时间 `O(nh)`、空间 `O(n)`；普通索引 BST **没有最坏 `O(log n)` 的高度保证**，因此最坏时间仍可为 `O(n²)`。若用保持平衡的索引搜索树或树状数组，才能保证最坏 `O(n log n)`。这个例子说明：索引 BST 的真正贡献是把“右侧已有多少较小键”化为一次排名查询。
+
+“交叉分布”的含义与教材目录和教学幻灯片一致，可参阅[出版社目录](https://www.cmpedu.com/books/book/2052604.htm)与[大学课程讲义](https://homepage.ntu.edu.tw/~dwhuang/courses/dsnp/DS_11.pdf)。
+
+## 12. 文件与运行
 
 | 文件 | 内容 |
 | --- | --- |
 | `binarySearchTree.hpp` | BST 字典、搜索、插入、删除、高度和中序遍历 |
+| `indexedBinarySearchTree.hpp` | 带子树规模的索引 BST、按序号取值、排名和按序号删除 |
+| `histogram.hpp`、`bestFitBinPacking.hpp`、`crossingDistribution.hpp` | 三个应用算法 |
 | `chapter14Demo.cpp` | 逐步操作示例 |
-| `testChapter14.cpp` | 三类删除、随机与 `std::map` 对照、退化树测试 |
+| `testChapter14.cpp`、`testIndexedBST.cpp`、`testChapter14Applications.cpp` | BST、索引 BST 与应用测试 |
 
 在 `Chapter14` 目录运行：
 
@@ -128,8 +219,12 @@ g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror chapter14Demo.cpp -o chapter
 .\chapter14Demo.exe
 g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter14.cpp -o testChapter14.exe
 .\testChapter14.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testIndexedBST.cpp -o testIndexedBST.exe
+.\testIndexedBST.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter14Applications.cpp -o testChapter14Applications.exe
+.\testChapter14Applications.exe
 ```
 
 测试通过时不输出内容；不要加 `-DNDEBUG`，否则 `assert` 不运行。
 
-**课后思考：** ① 只检查“左孩子比父小、右孩子比父大”为什么还不够？② 删除双孩子结点时，为什么中序后继不会有左孩子？③ 依次插入升序键和先插入中位数，树高会怎样不同？④ 为什么 BST 的中序遍历有序，而普通二叉树或最大堆不保证这一点？
+**课后思考：** ① 删除索引 BST 的一个结点时，哪些祖先的 `subtreeSize` 必须变化？② `rank(5)` 在键 5 不存在时应该返回什么？③ 为什么箱子的剩余容量改变后不能原地改 BST 的键？④ 为什么交叉分布可以从右向左扫描并用 `rank` 计数？⑤ 普通索引 BST 为什么不能保证每一步都是 `O(log n)`？

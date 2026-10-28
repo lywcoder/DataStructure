@@ -39,6 +39,21 @@ public:
         return nullptr;
     }
 
+    // 返回最小的、不小于 key 的数对；若所有键都更小则返回 nullptr。
+    value_type* lowerBound(const K& key) const {
+        Node* current = root_;
+        Node* candidate = nullptr;
+        while (current) {
+            if (less_(current->element.first, key))
+                current = current->right; // 当前键太小，答案只能在右边
+            else {
+                candidate = current;      // 当前键可用，左边可能有更紧的答案
+                current = current->left;
+            }
+        }
+        return candidate ? &candidate->element : nullptr;
+    }
+
     void insert(const value_type& item) override {
         Node** link = &root_; // 始终指向“下一棵子树的入口”
         while (*link) {
