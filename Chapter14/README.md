@@ -228,3 +228,5 @@ g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter14Applications.cp
 测试通过时不输出内容；不要加 `-DNDEBUG`，否则 `assert` 不运行。
 
 **课后思考：** ① 删除索引 BST 的一个结点时，哪些祖先的 `subtreeSize` 必须变化？② `rank(5)` 在键 5 不存在时应该返回什么？③ 为什么箱子的剩余容量改变后不能原地改 BST 的键？④ 为什么交叉分布可以从右向左扫描并用 `rank` 计数？
+
+Binary Search Tree is crucial!!! ---Lin
