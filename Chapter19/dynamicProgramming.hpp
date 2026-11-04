@@ -167,7 +167,8 @@ struct BellmanFordResult {
     std::vector<int> parent;
 };
 
-// 第 r 轮松弛后得到至多 r 条边的最短简单路径；第 V 轮仍改进意味着可达负环。
+// 每一完整轮都保证覆盖“至多再多一条边”的路径；原地更新可能在同一轮
+// 传播更远。V-1 轮后所有简单最短路已被覆盖，之后仍可改进说明可达负环。
 inline BellmanFordResult bellmanFord(
     int vertexCount, const std::vector<WeightedEdge>& edges, int source) {
     if (vertexCount <= 0) throw std::invalid_argument("vertex count must be positive");

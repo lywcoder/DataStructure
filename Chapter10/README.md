@@ -2,6 +2,17 @@
 
 本章用同一个字典接口对比五种存储结构：有序数组、有序链表、跳表、链地址散列和线性探查散列。仓库的 `Chapter9` 是队列，因此跳表与散列的现有代码保留在 `Chapter10`；下文按字典、跳表、散列和 LZW 的学习顺序讲解。
 
+### 学习目标与先修知识
+
+先修第 5–6 章数组与链表、第 3 章期望／均摊／最坏复杂度。学完后应能：
+
+1. 从字典 ADT 的键唯一语义出发比较五种实现。
+2. 推演跳表的水平移动、下降、前驱数组与随机晋升。
+3. 分别解释链地址、线性探查、墓碑和重散列的不变量。
+4. 区分随机期望 `O(log n)`、良好散列下平均 `O(1)`、扩容均摊与线性最坏情况。
+5. 说明哈希函数、相等关系与严格弱序必须保持一致。
+6. 手算 LZW 编码、同步解码与 `KwKwK` 特殊分支。
+
 ## 1. 字典是“做什么”，数据结构是“怎么做”
 
 字典（dictionary）是一种抽象数据类型（ADT）：保存“键 → 值”数对，每个键最多对应一个值。它不是某一种具体链表或数组，也不一定按键排序。
@@ -250,18 +261,18 @@ typename skipList<K, E>::value_type*
 | `testSkipListHashTable.cpp` | 跳表和链地址哈希表测试 |
 | `testLinearProbingLzw.cpp` | 线性探查、墓碑、重散列和 LZW 往返测试 |
 
-在 `Chapter10` 目录执行，四个带 `main` 的源文件必须**各自生成一个可执行文件**，不要一起链接：
+从仓库根目录执行，四个带 `main` 的源文件必须**各自生成一个可执行文件**，不要一起链接：
 
 ```powershell
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror dictionaryDemo.cpp -o dictionaryDemo.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testSortedDictionary.cpp -o testSortedDictionary.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testSkipListHashTable.cpp -o testSkipListHashTable.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testLinearProbingLzw.cpp -o testLinearProbingLzw.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter10/dictionaryDemo.cpp -o Chapter10/dictionaryDemo.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter10/testSortedDictionary.cpp -o Chapter10/testSortedDictionary.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter10/testSkipListHashTable.cpp -o Chapter10/testSkipListHashTable.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter10/testLinearProbingLzw.cpp -o Chapter10/testLinearProbingLzw.exe
 
-.\dictionaryDemo.exe
-.\testSortedDictionary.exe
-.\testSkipListHashTable.exe
-.\testLinearProbingLzw.exe
+.\Chapter10\dictionaryDemo.exe
+.\Chapter10\testSortedDictionary.exe
+.\Chapter10\testSkipListHashTable.exe
+.\Chapter10\testLinearProbingLzw.exe
 ```
 
 以上为 PowerShell 语法；Bash/WSL 中运行程序可用 `./程序名.exe`。测试依赖 `assert`，不要添加 `-DNDEBUG`，否则断言会被禁用。
@@ -270,3 +281,16 @@ g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testLinearProbingLzw.cpp -o 
 
 异常测试还检查：数对复制中途失败时清理已复制结点、复制赋值失败后保留原内容，以及 rehash 中途散列失败时保持旧桶和旧链接不变。
 线性探查测试另外检查：墓碑不能截断查找、碰撞与 `std::map` 对照、复制和自赋值、非默认构造类型、重散列中哈希失败后的旧表完整性及数对指针稳定性。LZW 测试检查 `ABABABA` 的特殊码流，并在不同字典容量下对文本和随机二进制字节进行编码解码往返。
+
+## 9. 分层练习与答案提示
+
+1. 画出键 `10,20,15,25` 在固定随机层高下的跳表，并列出查找 18 的移动路径。
+2. 构造所有键散列到同一桶的输入，比较两种哈希表的失败查找成本。
+3. 在线性探查中把墓碑直接改为空槽，给出查找被错误截断的例子。
+4. 为什么 rehash 后桶位置改变，但本实现返回的数对指针仍可稳定？这个保证来自哪种所有权设计？
+5. 手算 `ABABABA` 的编码，并逐码解出 258；说明 `KwKwK` 为什么合法。
+6. 若 LZW 字典满后编码器清表、解码器却停止新增，会在哪一步失去同步？
+
+提示：开放寻址失败查找遇到真正空槽才可停止；墓碑只表示“这里曾参与探查链”。平均常数时间不能覆盖敌意哈希或满表。
+
+下一章把键关系扩展为层次关系。字典的所有权、比较器一致性和“不把期望写成最坏保证”会继续用于搜索树。

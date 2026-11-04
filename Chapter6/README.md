@@ -2,6 +2,17 @@
 
 本章继续使用第 5 章的线性表 ADT，但将元素放在独立的**结点**中，用链接决定先后顺序。阅读顺序：先理解结点与三种链表，再看稳定分桶如何支撑箱子排序和基数排序，最后看双链表用于凸包、父链接用于并查集。配套的 `chapter6Demo.cpp` 展示运行结果，`testChapter6.cpp` 检查边界与正确性。
 
+### 学习目标与先修知识
+
+先修第 5 章的线性表语义、动态所有权和迭代器。学完后应能：
+
+1. 画出单链、循环带头结点链表和双向循环链表的表示不变量。
+2. 在头、中、尾三种位置更新链接，并说明更新顺序为何不能颠倒。
+3. 区分“按下标找到位置”的成本与“已有结点迭代器后修改”的成本。
+4. 证明稳定分桶为何保证 LSD 基数排序正确。
+5. 用叉积和栈不变量解释 Andrew 凸包。
+6. 解释并查集的路径压缩、按大小合并和近常数均摊成本。
+
 ## 1. 抽象线性表与链式描述
 
 线性表仍是有位置顺序的序列 `(a₀, a₁, …, aₙ₋₁)`。`linearList.hpp` 规定 `get`、`indexOf`、`insert`、`erase` 等操作；数组表与链表实现的是**同一组行为**，区别在于如何保存元素。
@@ -125,11 +136,15 @@ header ⇄ [10] ⇄ [20] ⇄ [30] ⇄ header
 
 实现用 `std::vector<int>` 保存父结点编号和集合大小；逻辑结构是由父链接形成的森林，**不是线性链表**。`find`、`unite`、`connected` 在这两种优化一起使用时，摊还时间为 `O(α(n))`，`α` 是增长极慢的反阿克曼函数；空间 `O(n)`。`unite` 返回 `false` 表示两个元素本就在同一集合，集合数不会再减少。编号必须位于 `[0,n)`。
 
-## 9. 原代码中的问题与本章接口约定
+## 9. 表示不变量、所有权与边界
 
-原始结点构造没有完整初始化 `next`；原单链表复制遇到异常可能遗留已分配结点；成员箱子排序的 `top` 类型错误；独立箱子排序少处理了一个记录且学生姓名是未明确归属的裸指针；循环表扩展接口是私有继承，并在 const 查找中修改头结点。新版修复这些问题，并补上此前缺少的双链表、基数排序、凸包和并查集。
+单链表为空时 `firstNode==lastNode==nullptr`；非空时 `lastNode->next==nullptr`，从 `firstNode` 恰好走 `listSize` 个结点到空指针。带头结点循环表始终有哨兵，空表时 `header->next==header`。双向循环表还要求每条链接互为逆关系：`x->next->prev==x` 与 `x->prev->next==x`。
 
-三个链表的无效下标抛 `std::out_of_range`；单链表构造的 `initialCapacity < 1`、非法桶数或基数等抛 `std::invalid_argument`。教材 ADT 的 `T& get(int) const` 有 const 正确性缺陷，本章为兼容后续章节保留它，并额外提供 const 正确的 `at`。链表的虚函数 `indexOf`、`output` 需要元素支持 `==` 和流输出 `<<`。
+容器拥有所有结点，析构或 `clear` 必须恰好释放一次；复制构造创建全新结点，不能共享裸指针。迭代器是非拥有观察者：删除其结点或销毁容器后失效。单链表删除某结点还需要前驱，因此只有拿到“前驱位置”的算法才能常数时间删除；单凭待删结点指针无法安全处理尾结点和外部身份语义。
+
+三个链表的无效下标抛 `std::out_of_range`；单链表构造的 `initialCapacity < 1`、非法桶数或基数等抛 `std::invalid_argument`。教材 ADT 的 `T& get(int) const` 有 const 正确性缺陷，本章为兼容保留，并提供 const 正确的 `at`。`indexOf` 需要 `==`，流输出需要 `<<`，排序和凸包还有各自更强的类型前提。
+
+对 `chain` 按下标插删时仍需从头定位，最坏 `O(n)`；若算法已经持有前驱或尾指针，局部链接修改是 `O(1)`。讲复杂度时必须说清接口给了什么位置知识，不能笼统说“链表插入总是常数时间”。
 
 ## 10. 文件与运行方式
 
@@ -142,15 +157,39 @@ header ⇄ [10] ⇄ [20] ⇄ [30] ⇄ header
 | `radixSort.hpp`、`convexHull.hpp`、`disjointSet.hpp` | 基数排序、凸包、并查集 |
 | `chapter6Demo.cpp`、`testChapter6.cpp` | 可读演示与断言测试 |
 
-在 `Chapter6` 目录中，用 C++11 编译。演示与测试各有 `main`，分别生成程序；两者都需链接 `binSort.cpp`：
+从仓库根目录编译。演示与测试各有 `main`，分别生成程序；两者都需链接 [`binSort.cpp`](./binSort.cpp)：
 
 ```powershell
-g++ -std=c++11 -Wall -Wextra -Wpedantic -Werror chapter6Demo.cpp binSort.cpp -o chapter6Demo.exe
-.\chapter6Demo.exe
-g++ -std=c++11 -Wall -Wextra -Wpedantic -Werror testChapter6.cpp binSort.cpp -o testChapter6.exe
-.\testChapter6.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter6/chapter6Demo.cpp Chapter6/binSort.cpp -o Chapter6/chapter6Demo.exe
+.\Chapter6\chapter6Demo.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter6/testChapter6.cpp Chapter6/binSort.cpp -o Chapter6/testChapter6.exe
+.\Chapter6\testChapter6.exe
 ```
 
 测试通过时没有输出。测试使用 `assert`，不要加 `-DNDEBUG`。目前覆盖三种链表的边界与深拷贝、每种 1500 步随机操作与 `std::vector` 对照、稳定箱子排序、1000 个随机非负整数的基数排序、凸包退化情况，以及并查集的 500 步随机合并与朴素集合标签对照。
 
-**课后自查：** ① 单链表已有尾指针，为什么删尾仍可能是 `O(n)`？② LSD 基数排序若每趟不稳定会怎样？③ 凸包用双链表作栈时为什么需要看倒数第二个点？④ 并查集的父链接森林与线性表的 `next` 链有什么不同？可分别回看第 2、6、7、8 节。
+## 11. 分层练习与答案提示
+
+### 链接推演
+
+1. 画出 `10→20→30` 删除头、删除尾后的首尾指针。
+2. 为什么单链表有尾指针仍不能常数时间删尾？
+3. 带头结点循环表在空表和单元素表时分别有哪些链接相等？
+
+提示：删尾需要找到倒数第二个结点；哨兵消除了空表首结点的特殊空指针分支。
+
+### 算法不变量
+
+4. 用 `[21,13,12,22]` 手算十进制 LSD 基数排序的个位、十位两趟。
+5. 构造一个“不稳定分桶导致基数排序错误”的最小例子。
+6. Andrew 凸包遇到三点共线时为何弹出中间点？若想保留边界共线点应改哪个条件？
+
+提示：比较 `cross<=0` 与 `cross<0` 的差别，并同时考虑重复端点。
+
+### 结构选择与证明
+
+7. 证明按大小合并不会让较小树的规模超过合并后树的一半。
+8. 为什么路径压缩会改变父链接，却不改变集合划分？
+9. 若频繁按下标随机读取又偶尔头插，数组和链表应如何权衡？
+
+下一章将继续讨论“根据结构性质压缩存储”，把二维矩阵映射到一维数组或稀疏项序列。

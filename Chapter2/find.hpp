@@ -1,9 +1,13 @@
 
+#ifndef CHAPTER2_FIND_HPP
+#define CHAPTER2_FIND_HPP
+
 template <class T>
 int sequentialSearch(T a[], int n, const T& x) {
-    int i;
-    for (i = 0; i < n && a[i] != x; i++) {
-        if (i == n) return -1;
-        else return i;
-    }
+    for (int i = 0; i < n; ++i)
+        if (a[i] == x)
+            return i;
+    return -1;
 }
+
+#endif

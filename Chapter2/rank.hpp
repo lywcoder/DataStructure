@@ -1,3 +1,6 @@
+#ifndef CHAPTER2_RANK_HPP
+#define CHAPTER2_RANK_HPP
+
 template <class T>
 void rank(T a[], int n, int r[]) {
     for (int i = 0; i < n; i++) {
@@ -29,3 +32,5 @@ void rearrange(T a[], int n, int r[]) {
     
     delete[] u;
 } 
+
+#endif

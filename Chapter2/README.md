@@ -1,15 +1,25 @@
 # 第二章：排序的核心思想与及时终止
 
-目标：理解每轮排序“保证了什么”，再判断何时可以安全少做工作。以下均按非递减顺序排序。
+本章目标不是记住四段循环，而是理解每轮排序“保证了什么”，再据此证明算法、判断稳定性，并决定何时可以安全少做工作。以下均按非递减顺序排序。
+
+### 学习目标与先修知识
+
+先修第 1 章的数组、模板、循环不变量和测试方法。学完后应能：
+
+1. 分别写出冒泡、选择、插入和排名排序的循环不变量。
+2. 用一组具体数据逐轮推演，解释每次比较与移动的目的。
+3. 区分“本轮无需动作”“活动区间已有序”“整个数组已有序”。
+4. 判断稳定性，并构造带身份的重复键反例。
+5. 分析比较次数、移动次数、最好／最坏时间与额外空间。
+6. 正确使用顺序查找、普通多项式求值和 Horner 法，比较其乘法次数。
 
 ## 1. 阅读顺序与接口约定
 
 1. 先读本说明，掌握不变式和提前结束的条件。
 2. 再读配套 `sortingAlgorithms.hpp`（C++11、`chapter2` 命名空间），运行 `sortingDemo.cpp` 与 `testSortingAlgorithms.cpp`。
-3. 最后对照原始 `bubble.hpp`、`selection.hpp`、`insert.hpp`、`rank.hpp`、`rearrage.hpp`，注意第 7 节的区别。
+3. 最后对照独立基础头文件 [`bubble.hpp`](./bubble.hpp)、[`selection.hpp`](./selection.hpp)、[`insert.hpp`](./insert.hpp)、[`rank.hpp`](./rank.hpp)、[`rearrage.hpp`](./rearrage.hpp)，理解拆分接口与统一教学实现的关系。
 
-配套教学实现已放在本目录，原有教材示例文件保持不变；验证结果见第 8 节。
-`find.hpp` 是查找，`ploy.hpp` 是多项式求值，不属于排序，本说明不修改它们。
+配套教学实现已放在本目录；验证结果见第 8 节。[`find.hpp`](./find.hpp) 与 [`ploy.hpp`](./ploy.hpp) 是本章前置基础：顺序查找和两种多项式求值由 [`testFoundations.cpp`](./testFoundations.cpp) 单独验证。
 
 统一约定：
 
@@ -122,14 +132,14 @@ else ++r[j];
 这有完整数组的有序性证明，不能把“部分元素对已处理”当作提前结束的依据。
 基础排名固定比较 `n(n-1)/2` 对；有序输入上的预检查把最佳时间降为线性，无序时只额外增加线性检查。
 
-### 原始 `rearrage.hpp`：另一种原地重排
+### `rearrage.hpp`：另一种原地重排
 
-原始版本在 `r[i] != i` 时取 `t = r[i]`，同时交换 `a[i]` 与 `a[t]`、`r[i]` 与 `r[t]`。
+`rearrangeInPlace` 在 `r[i] != i` 时取 `t = r[i]`，同时交换 `a[i]` 与 `a[t]`、`r[i]` 与 `r[t]`。
 元素与自己的目标排名一起移动，沿置换环逐步归位；每次交换至少让一个位置归位，故重排为 `O(n)` 时间。
 完成后 `r[i] == i`，原始排名被改写。
 此重排步骤额外空间为 `O(1)`，但完整排名排序仍需要 `O(n)` 的排名数组。
 只要排名按上述规则唯一并处理平局，最终结果仍稳定；交换本身不自动意味着最终结果不稳定。
-它是原始实现的对照，不是新 `rearrange` 接口的行为。
+它会消耗排名数组；统一接口的 `rearrange` 则保留排名并使用辅助缓冲。两者是明确命名的替代方案。
 
 ## 6. 复杂度与稳定性对照
 
@@ -145,30 +155,29 @@ else ++r[j];
 排名及时终止版若在分配前检查有序性，已排序路径可以只用 `O(1)` 额外空间；表中列的是一般路径的空间上界。
 “及时终止”不是统一的 `break`：冒泡和选择可结束剩余轮次，插入只跳过本轮或停止内层，排名则靠排序前的全局检查。
 
-## 7. 对照原代码时的注意事项
+## 7. 独立基础头文件与易错点
 
-- `insert.hpp` 同时定义 `insert(T[], int&, const T&)` 与 `insert(T[], int, const T&)`。
-  `insert(a, i, t)` 对左值 `i` 会产生重载歧义；若仅保留引用版，它的 `n++` 还会意外改变外层循环的 `i`，跳过待处理元素。
-  新辅助函数独立命名，并按值接收长度，避免这两个问题。
+- [`insert.hpp`](./insert.hpp) 把“只写入额外槽位”的 `insert(a,n,x)` 与“同时更新长度”的 `insertAndGrow(a,n,x)` 分开命名，避免 `int` 与 `int&` 重载对左值实参产生二义性。插入排序必须使用不会修改外层循环变量的版本。
 - `bubble.hpp` 的注释版 `bool bubble(...)` 不能与原 `void bubble(...)` 仅凭返回类型重载；新接口改名为 `bubbleWithSwapFlag`。
   注释中的 `for (int i = n; i > 1 && bubble(a, i), i--);` 缺少第二个分号，逗号也不是条件与递减部分的分隔符。
-- 原头文件使用未限定的 `swap`，且缺少自包含的相应头文件；直接单独包含时不保证可编译。新实现应包含所需标准头并使用合适的 `std::swap`。
-- 原 `rank.hpp` 与 `rearrage.hpp` 定义了相同签名的 `rearrange`，不能直接放进同一翻译单元；它们分别是辅助数组与原地版本，应作为替代方案阅读。
+- 各独立头文件现在带包含保护，使用 `std::swap` 并包含所需标准头，可在同一翻译单元按需组合。辅助数组版本叫 `rearrange`，原地版本叫 `rearrangeInPlace`。
 - 原 `selection.hpp` 的 `indexOfMax` 对空数组返回 `0`，没有实际最大元素，不能据此访问；新接口对空数组返回 `-1`。
 - 原选择排序的注释版用“当前最大值与新元素”的比较间接判序；新版本显式检查相邻逆序，并在确认有序后、交换之前退出，证明更直接。
 - 原 `rank.hpp` 使用 `<=` 和 `new T[n]`，后者要求默认构造；新接口只比较 `<`，重排缓冲由原元素复制构造。
 
-这些是阅读提示，不表示原始文件已被修复；不要把注释版取消注释后直接与基础版混用。
+[`sequentialSearch`](./find.hpp) 返回第一个匹配位置，找不到或空区间返回 `-1`，最坏 `Theta(n)`。[`polyEval`](./ploy.hpp) 按 `c0+c1*x+...+cn*x^n` 逐次维护幂，需 `Theta(n)` 次系数乘法和 `Theta(n)` 次生成幂的乘法；`horner` 重写为 `(...(cn*x+c(n-1))*x+...)+c0`，只需 `n` 次乘法和 `n` 次加法。两者要求 `n>=0`，负次数抛异常。
 
 ## 8. 编译与验证
 
-安装 `g++` 后，在 `Chapter2` 目录分别编译、运行；两个源文件应各自生成可执行程序，不要合并链接：
+从仓库根目录分别编译、运行；三个源文件应各自生成可执行程序：
 
-```sh
-g++ -std=c++11 -Wall -Wextra -Wpedantic -Werror sortingDemo.cpp -o sortingDemo.exe
-./sortingDemo.exe
-g++ -std=c++11 -Wall -Wextra -Wpedantic -Werror testSortingAlgorithms.cpp -o testSortingAlgorithms.exe
-./testSortingAlgorithms.exe
+```powershell
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter2/sortingDemo.cpp -o Chapter2/sortingDemo.exe
+.\Chapter2\sortingDemo.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter2/testSortingAlgorithms.cpp -o Chapter2/testSortingAlgorithms.exe
+.\Chapter2\testSortingAlgorithms.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter2/testFoundations.cpp -o Chapter2/testFoundations.exe
+.\Chapter2\testFoundations.exe
 ```
 
 演示和测试已使用上述 C++11 严格警告选项编译运行通过，编辑器诊断无错误或警告。测试对八个版本分别验证了 3,280 个穷举输入和 200 个随机输入，覆盖以下项目：
@@ -191,3 +200,29 @@ g++ -std=c++11 -Wall -Wextra -Wpedantic -Werror testSortingAlgorithms.cpp -o tes
 | 排名 | 496 | 31 |
 
 选择优化版同时比较“当前最大值”和“相邻逆序”，所以一次扫描有两组比较；仍然是线性级别。及时终止不保证在所有输入上都更快。
+
+## 9. 分层练习与答案提示
+
+### 基础推演
+
+1. 对 `[4,1,3,2]` 分别写出冒泡和选择排序每轮后的数组。
+2. 插入排序处理到 `i=3` 前，哪一段必须有序？
+3. 为 `[2甲,2乙,1]` 推演选择排序，指出稳定性何时被破坏。
+
+提示：插入排序只承诺前缀 `[0,i)` 有序；远距离交换可能让两个等价键换序。
+
+### 正确性与复杂度
+
+4. 证明冒泡一趟后活动区间最大值一定在末尾。
+5. 为什么插入排序在有序输入上为 `Theta(n)`，但基础冒泡仍为 `Theta(n²)`？
+6. 排名规则为何要让后出现的等价键增加排名？
+
+提示：第 6 题用原下标打破平局，既保证排名唯一，也保持稳定顺序。
+
+### 迁移与反例
+
+7. 构造“最大值已在末尾但前缀无序”的数组，说明选择排序不能据此退出。
+8. 比较 `polyEval` 与 Horner 法的乘法次数；若 `T` 的乘法很昂贵，差别如何体现？
+9. 若比较器不满足传递性，四种排序的“不变式”在哪一步失去依据？
+
+下一章将系统化这些比较次数与移动次数，把代码结构转换为渐近复杂度。

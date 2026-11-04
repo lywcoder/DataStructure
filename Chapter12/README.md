@@ -2,6 +2,17 @@
 
 本章先学“优先级队列允许做什么”，再学“堆为什么能高效做到”，接着学习适合**合并**的左高树，最后用堆完成排序、霍夫曼编码和机器调度。建议阅读顺序：第 1～6 节 → `chapter12Demo.cpp` → 第 7～10 节 → `testChapter12.cpp`。
 
+### 学习目标与先修知识
+
+先修第 9 章队列、第 11 章二叉树和第 3 章求和分析。学完后应能：
+
+1. 区分优先级队列 ADT、完全二叉堆形状和最大堆序。
+2. 手算上滤、下滤及自底向上建堆，并证明建堆为 `O(n)`。
+3. 解释左高树为何限制右路径而不限制整树高度。
+4. 比较数组堆与 HBLT 在合并操作上的差异。
+5. 推演堆排序并判断其原地性、最坏成本与不稳定性。
+6. 用交换论证理解霍夫曼合并，用调度实例区分启发式与最优保证。
+
 ## 1. 优先级队列：先取最重要的元素
 
 普通队列按进入时间出队（FIFO）；优先级队列按**优先级**取出元素。最大优先级队列每次暴露优先级最高的元素。`pqueue.hpp` 中的 `maxPriorityQueue<T>` 是抽象数据类型（ADT）：
@@ -216,15 +227,28 @@ std::sort_heap(a.begin(), a.end());      // 堆区间排序后不再保持堆形
 | `machineScheduling.hpp` | LPT 多机器调度 |
 | `chapter12Demo.cpp`、`testChapter12.cpp` | 演示与断言测试 |
 
-在 `Chapter12` 目录运行：
+从仓库根目录运行：
 
 ```powershell
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror chapter12Demo.cpp -o chapter12Demo.exe
-.\chapter12Demo.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter12.cpp -o testChapter12.exe
-.\testChapter12.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter12/chapter12Demo.cpp -o Chapter12/chapter12Demo.exe
+.\Chapter12\chapter12Demo.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter12/testChapter12.cpp -o Chapter12/testChapter12.exe
+.\Chapter12\testChapter12.exe
 ```
 
 测试通过时无输出。测试使用 `assert`，编译时不要加 `-DNDEBUG`；它将数组堆和 HBLT 操作与 STL 优先队列对照，逐步检查左高性质，核对堆排序与 `std::sort`、霍夫曼前缀性质及往返解码、机器调度的时间区间。
+
+## 12. 分层练习与答案提示
+
+1. 把 `[3,1,6,5,2,4]` 自底向上建成最大堆，写出每次下滤。
+2. 为什么删除根后必须在两个孩子中选择较大者交换？构造选错孩子的反例。
+3. 用“高度为 `h` 的结点数量至多约 `n/2^(h+1)`”完成 `O(n)` 建堆求和。
+4. 画出两棵 HBLT 合并时根选择、递归合并右子树和交换左右孩子的过程。
+5. 对频率 `5,9,12,13,16,45` 构造霍夫曼树并计算带权路径长度 224。
+6. 给出多机器 LPT 调度不保证最优的实例，并说明实现仍保证什么。
+
+提示：堆序只保证父不小于孩子，不保证兄弟或同层整体有序；霍夫曼的每个合并结点权重等于两子树权重之和。
+
+下一章把堆的“只保留局部父子优先关系”改造成显式比赛记录，从而高效支持固定参赛位置的反复更新和多路归并。
 
 **课后思考：** ① 为什么堆顶最大，不代表数组第 2 个元素一定第二大？② 数组堆的 `pop` 为什么必须用最后一个元素补根？③ HBLT 的 `s` 值为什么不是普通树高？④ HBLT 合并时为什么要把较小根合并到较大根的右子树？⑤ 霍夫曼树为什么用最小堆，而优先级最高先处理的队列通常用最大堆？

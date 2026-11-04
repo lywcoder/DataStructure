@@ -1,3 +1,8 @@
+#ifndef CHAPTER2_SELECTION_HPP
+#define CHAPTER2_SELECTION_HPP
+
+#include <utility>
+
 template<class T>
 int indexOfMax(T a[], int n) {
     int indexOfMax = 0;
@@ -14,7 +19,7 @@ template <class T>
 void selectionSort(T a[], int n) {
     for (int size = n; size > 1; size--) {
         int j = indexOfMax(a, size);
-        swap(a[j], a[size - 1]);
+        std::swap(a[j], a[size - 1]);
     }
 }
 
@@ -34,3 +39,5 @@ void selectionSort(T a[], int n) {
 //         swap(a[indexOfMax], a[size - 1]);
 //     }
 // }
+
+#endif

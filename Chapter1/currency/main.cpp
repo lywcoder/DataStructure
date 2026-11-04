@@ -9,7 +9,7 @@ int main() {
 
     j = h.add(g);
     h.output();
-    std::cout << "+";
+    std::cout << " + ";
     g.output();
     std::cout << " = ";
     j.output();
@@ -19,5 +19,11 @@ int main() {
 
     j = i.increment(g).add(h);
 
-    std::cout << "Attemping to initialize with cents = 152" << std::endl;
+    std::cout << "Attempting to initialize with cents = 152: ";
+    try {
+        currency invalid(signType::plus, 1, 152);
+        invalid.output(); // Unreachable: construction must reject invalid cents.
+    } catch (const illegalParameterValue& error) {
+        error.outputMessage();
+    }
 }

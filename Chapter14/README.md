@@ -2,6 +2,17 @@
 
 本章从“怎样同时方便地**按键查找**和**插入**”出发，推导二叉搜索树（BST）的结构，再讲解索引 BST 和三个应用。建议先读第 1～4 节并运行 `chapter14Demo.cpp`，再对照源码阅读后面的算法。
 
+### 学习目标与先修知识
+
+先修第 10 章字典和第 11 章二叉树。学完后应能：
+
+1. 用严格弱序写出 BST 的全局区间不变量，而不只检查父子大小。
+2. 推演搜索、插入和叶子／单孩子／双孩子删除。
+3. 解释为何双孩子删除移动后继结点而不赋值 `const` 键。
+4. 用树高 `h` 报告成本，并明确普通 BST 可能退化为链。
+5. 维护索引 BST 的 `subtreeSize`，实现选择、排名和按排名删除。
+6. 把直方图、Best-Fit 与交叉分布映射到字典和排名操作，同时识别启发式保证边界。
+
 ## 1. 为什么会想到二叉搜索树？
 
 我们要实现一个字典：保存“键 → 值”，按键找值、加入新键、删除旧键。前面学过两种有序存储：
@@ -200,7 +211,7 @@ C = [8,7,4,2,5,1,9,3,10,6]
 
 `crossingDistribution.hpp` 对输入先检查是否为排列，返回 `perWire` 和 `total`。若当前树高为 `h`，总时间 `O(nh)`、空间 `O(n)`；普通索引 BST **没有最坏 `O(log n)` 的高度保证**，因此最坏时间仍可为 `O(n²)`。若用保持平衡的索引搜索树或树状数组，才能保证最坏 `O(n log n)`。这个例子说明：索引 BST 的真正贡献是把“右侧已有多少较小键”化为一次排名查询。
 
-“交叉分布”的含义与教材目录和教学幻灯片一致，可参阅[出版社目录](https://www.cmpedu.com/books/book/2052604.htm)与[大学课程讲义](https://homepage.ntu.edu.tw/~dwhuang/courses/dsnp/DS_11.pdf)。
+本章使用“每条线与其右侧线的交叉数”作为交叉分布的明确定义；若课程采用“每条线参与的全部交叉数”等其他定义，应先改输出规格，再调整扫描方向和计数方式。
 
 ## 12. 文件与运行
 
@@ -212,21 +223,31 @@ C = [8,7,4,2,5,1,9,3,10,6]
 | `chapter14Demo.cpp` | 逐步操作示例 |
 | `testChapter14.cpp`、`testIndexedBST.cpp`、`testChapter14Applications.cpp` | BST、索引 BST 与应用测试 |
 
-在 `Chapter14` 目录运行：
+从仓库根目录运行：
 
 ```powershell
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror chapter14Demo.cpp -o chapter14Demo.exe
-.\chapter14Demo.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter14.cpp -o testChapter14.exe
-.\testChapter14.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testIndexedBST.cpp -o testIndexedBST.exe
-.\testIndexedBST.exe
-g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror testChapter14Applications.cpp -o testChapter14Applications.exe
-.\testChapter14Applications.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter14/chapter14Demo.cpp -o Chapter14/chapter14Demo.exe
+.\Chapter14\chapter14Demo.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter14/testChapter14.cpp -o Chapter14/testChapter14.exe
+.\Chapter14\testChapter14.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter14/testIndexedBST.cpp -o Chapter14/testIndexedBST.exe
+.\Chapter14\testIndexedBST.exe
+g++ -std=c++11 -O2 -Wall -Wextra -Wpedantic -Werror Chapter14/testChapter14Applications.cpp -o Chapter14/testChapter14Applications.exe
+.\Chapter14\testChapter14Applications.exe
 ```
 
 测试通过时不输出内容；不要加 `-DNDEBUG`，否则 `assert` 不运行。
 
-**课后思考：** ① 删除索引 BST 的一个结点时，哪些祖先的 `subtreeSize` 必须变化？② `rank(5)` 在键 5 不存在时应该返回什么？③ 为什么箱子的剩余容量改变后不能原地改 BST 的键？④ 为什么交叉分布可以从右向左扫描并用 `rank` 计数？
+## 13. 分层练习与答案提示
 
-Binary Search Tree is crucial!!! ---Lin
+1. 依次插入 `8,3,10,1,6,14,4,7,13`，写出中序序列和高度。
+2. 分别删除叶子 7、单孩子结点 14、双孩子结点 3，逐步画链接变化。
+3. 删除索引 BST 的一个结点时，哪些祖先的 `subtreeSize` 必须变化？后继摘除路径为何也要更新？
+4. `rank(5)` 在键 5 不存在时应返回什么？说明它与 `lower_bound` 位置的关系。
+5. 为什么箱子剩余容量改变后不能原地修改 BST 键？应执行哪三步？
+6. 用排列 `[3,1,4,2]` 从右向左推演交叉分布，并与所有逆序对枚举核对。
+7. 构造升序插入使普通 BST 高度为 `n`；说明索引字段为何不能改善高度。
+
+提示：改变一个键会破坏该结点相对整棵祖先区间的顺序，应删除旧键并插入新键；`rank` 对不存在键返回严格更小键的数量。
+
+下一章在相同字典语义上加入 AVL 高度、红黑黑高与 B 树占用约束，获得最坏对数级高度。

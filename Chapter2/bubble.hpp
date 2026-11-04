@@ -1,8 +1,13 @@
+#ifndef CHAPTER2_BUBBLE_HPP
+#define CHAPTER2_BUBBLE_HPP
+
+#include <utility>
+
 template<class T> 
 void bubble(T a[], int n) {
     //将a数组中的最大元素移到右边
     for (int i = 0; i < n - 1; i++) {
-        if (a[i] > a[i + 1]) swap(a[i], a[i + 1]);
+        if (a[i] > a[i + 1]) std::swap(a[i], a[i + 1]);
     }
 }
 
@@ -25,6 +30,8 @@ void bubbleSort(T a[], int n) {
 //     }
 //     return swapped;
 // }
+
+#endif
 
 // template<class T>
 // void bubbleSort(T a[], int n) {

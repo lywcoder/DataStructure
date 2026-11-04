@@ -1,5 +1,7 @@
+#ifndef CHAPTER1_CURRENCY_H
+#define CHAPTER1_CURRENCY_H
+
 #include <iostream>
-#include <exception>
 #include <string>
 
 // 定义异常类
@@ -7,7 +9,7 @@ class illegalParameterValue {
 public:
     illegalParameterValue(std::string theMessage = "Illegal parameter value")
         : message(theMessage) {}
-    void outputMessage() { std::cout << message << std::endl; }
+    void outputMessage() const { std::cout << message << std::endl; }
 private:
     std::string message;
 };
@@ -23,6 +25,7 @@ public:
 
     ~currency() {}
     void setValue(signType, unsigned long, unsigned int);
+    // Round the supplied binary value to cents; prefer integer input for money.
     void setValue(double);
     signType getSign() const { return sign; }
     unsigned long getDollars() const { return dollars; }
@@ -35,3 +38,5 @@ private:
     unsigned long dollars;
     unsigned int cents;
 };
+
+#endif
